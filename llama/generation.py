@@ -64,7 +64,7 @@ class LLaMA:
                 logits = logits_new
             if temperature > 0:
                 probs = torch.softmax(logits / temperature, dim=-1)
-                if sampler == "top_k":
+                if top_k:
                     next_token = sample_top_k(probs, top_p=top_p, top_k=top_k)
                 else:
                     next_token = sample_top_p(probs, top_p)
