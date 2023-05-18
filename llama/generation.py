@@ -42,10 +42,11 @@ class LLaMA:
         for k, t in enumerate(prompt_tokens):
             tokens[k, : len(t)] = torch.tensor(t).long()
         input_text_mask = tokens != self.tokenizer.pad_id
-        start_pos = min_prompt_size + 1
+        start_pos = min_prompt_size
         prev_pos = 0
         for cur_pos in range(start_pos, total_len):
-            logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
+            with torch.no_grad():
+                logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
             # repetition penalty from CTRL paper (https://arxiv.org/abs/1909.05858)
             if repetition_penalty != 1.0:
                 logits_new = logits.clone()
@@ -64,7 +65,7 @@ class LLaMA:
                 logits = logits_new
             if temperature > 0:
                 probs = torch.softmax(logits / temperature, dim=-1)
-                if top_k:
+                if top_k > 0:
                     next_token = sample_top_k(probs, top_p=top_p, top_k=top_k)
                 else:
                     next_token = sample_top_p(probs, top_p)
