@@ -13,7 +13,8 @@ from pathlib import Path
 
 from fairscale.nn.model_parallel.initialize import initialize_model_parallel
 
-from llama import ModelArgs, Transformer, Tokenizer, LLaMA
+from llama import Transformer, Tokenizer, LLaMA
+from llama import ModelArgs_v1 as ModelArgs
 
 
 def setup_model_parallel() -> Tuple[int, int]:
