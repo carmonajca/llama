@@ -9,7 +9,7 @@ def get_requirements(path: str):
 
 setup(
     name="llama",
-    version="0.0.2",
+    version="0.0.2.mod",
     packages=find_packages(),
     install_requires=get_requirements("requirements.txt"),
 )
