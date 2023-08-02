@@ -191,6 +191,8 @@ class Llama:
         prompt_tokens: List[List[int]],
         max_gen_len: int,
         temperature: float = 0.6,
+        repetition_penalty: float = (1.0 / 0.85),
+        top_k: int = 40,
         top_p: float = 0.9,
         logprobs: bool = False,
         echo: bool = False,
@@ -215,7 +217,24 @@ class Llama:
         eos_reached = torch.tensor([False] * bsz, device="cuda")
         input_text_mask = tokens != pad_id
         for cur_pos in range(min_prompt_len, total_len):
-            logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
+            with torch.no_grad():
+                logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
+            # repetition penalty from CTRL paper (https://arxiv.org/abs/1909.05858)
+            if repetition_penalty != 1.0:
+                logits_new = logits.clone()
+                batch_size = len(tokens)
+                for i in range(batch_size):
+                    for token in set(tokens[i].tolist()):
+                        # if score < 0 then repetition penalty has to multiplied to reduce the previous token probability
+                        if logits[i, token] < 0:
+                            logits_new[i, token] = (
+                                logits[i, token] * repetition_penalty
+                            )
+                        else:
+                            logits_new[i, token] = (
+                                logits[i, token] / repetition_penalty
+                            )
+                logits = logits_new
             if logprobs:
                 token_logprobs[:, prev_pos + 1 : cur_pos + 1] = -F.cross_entropy(
                     input=logits.transpose(1, 2),
@@ -225,7 +244,10 @@ class Llama:
                 )
             if temperature > 0:
                 probs = torch.softmax(logits[:, -1] / temperature, dim=-1)
-                next_token = sample_top_p(probs, top_p)
+                if top_k > 0:
+                    next_token = sample_top_k(probs, top_p=top_p, top_k=top_k)
+                else:
+                    next_token = sample_top_p(probs, top_p)
             else:
                 next_token = torch.argmax(logits[:, -1], dim=-1)
 
