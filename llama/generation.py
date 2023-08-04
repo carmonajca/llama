@@ -94,23 +94,23 @@ class LLaMA:
                 for i in range(batch_size):
                     for token in set(tokens[i].tolist()):
                         # if score < 0 then repetition penalty has to multiplied to reduce the previous token probability
-                        if logits[i, token] < 0:
-                            logits_new[i, token] = (
-                                logits[i, token] * repetition_penalty
+                        if any(logits[i, ..., token] < 0):
+                            logits_new[i, ..., token] = (
+                                logits[i, ..., token] * repetition_penalty
                             )
                         else:
-                            logits_new[i, token] = (
-                                logits[i, token] / repetition_penalty
+                            logits_new[i, ..., token] = (
+                                logits[i, ..., token] / repetition_penalty
                             )
                 logits = logits_new
             if temperature > 0:
-                probs = torch.softmax(logits / temperature, dim=-1)
+                probs = torch.softmax(logits[:, -1] / temperature, dim=-1)
                 if top_k > 0:
                     next_token = sample_top_k(probs, top_p=top_p, top_k=top_k)
                 else:
                     next_token = sample_top_p(probs, top_p)
             else:
-                next_token = torch.argmax(logits, dim=-1)
+                next_token = torch.argmax(logits[:, -1], dim=-1)
             next_token = next_token.reshape(-1)
             # only replace token if prompt has already been generated
             next_token = torch.where(
@@ -217,8 +217,7 @@ class Llama:
         eos_reached = torch.tensor([False] * bsz, device="cuda")
         input_text_mask = tokens != pad_id
         for cur_pos in range(min_prompt_len, total_len):
-            with torch.no_grad():
-                logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
+            logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
             # repetition penalty from CTRL paper (https://arxiv.org/abs/1909.05858)
             if repetition_penalty != 1.0:
                 logits_new = logits.clone()
@@ -226,13 +225,13 @@ class Llama:
                 for i in range(batch_size):
                     for token in set(tokens[i].tolist()):
                         # if score < 0 then repetition penalty has to multiplied to reduce the previous token probability
-                        if logits[i, token] < 0:
-                            logits_new[i, token] = (
-                                logits[i, token] * repetition_penalty
+                        if any(logits[i, ..., token] < 0):
+                            logits_new[i, ..., token] = (
+                                logits[i, ..., token] * repetition_penalty
                             )
                         else:
-                            logits_new[i, token] = (
-                                logits[i, token] / repetition_penalty
+                            logits_new[i, ..., token] = (
+                                logits[i, ..., token] / repetition_penalty
                             )
                 logits = logits_new
             if logprobs:
@@ -287,6 +286,8 @@ class Llama:
         self,
         prompts: List[str],
         temperature: float = 0.6,
+        repetition_penalty: float = (1.0 / 0.85),
+        top_k: int = 40,
         top_p: float = 0.9,
         max_gen_len: Optional[int] = None,
         logprobs: bool = False,
@@ -299,6 +300,8 @@ class Llama:
             prompt_tokens=prompt_tokens,
             max_gen_len=max_gen_len,
             temperature=temperature,
+            repetition_penalty=repetition_penalty,
+            top_k=top_k,
             top_p=top_p,
             logprobs=logprobs,
             echo=echo,
@@ -318,6 +321,8 @@ class Llama:
         self,
         dialogs: List[Dialog],
         temperature: float = 0.6,
+        repetition_penalty: float = (1.0 / 0.85),
+        top_k: int = 40,
         top_p: float = 0.9,
         max_gen_len: Optional[int] = None,
         logprobs: bool = False,
@@ -376,6 +381,8 @@ class Llama:
             prompt_tokens=prompt_tokens,
             max_gen_len=max_gen_len,
             temperature=temperature,
+            repetition_penalty=repetition_penalty,
+            top_k=top_k,
             top_p=top_p,
             logprobs=logprobs,
         )
@@ -410,8 +417,9 @@ def sample_top_p(probs, p):
 
 
 # sampler by Shawn
-def sample_top_k(probs, top_p=0.0, top_k=40):
+def sample_top_k(probs, top_p: float=0.0, top_k: int=40):
     if top_k > 0:
+        top_k = min(top_k, probs.numel())
         probs_sort, probs_idx = torch.topk(probs, top_k)
     else:
         probs_sort, probs_idx = torch.sort(probs, dim=-1, descending=True)
