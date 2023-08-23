@@ -3,7 +3,8 @@
 
 import math
 from dataclasses import dataclass
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional, Tuple, Union, Type
+from functools import partial
 
 import fairscale.nn.model_parallel.initialize as fs_init
 import torch
@@ -277,7 +278,7 @@ class FeedForward(nn.Module):
         dim: int,
         hidden_dim: int,
         multiple_of: int,
-        ffn_dim_multiplier: Optional[float],
+        ffn_dim_multiplier: Optional[float] = None,
     ):
         super().__init__()
         hidden_dim = int(2 * hidden_dim / 3)
@@ -309,7 +310,7 @@ class TransformerBlock_v1(nn.Module):
         self.head_dim = args.dim // args.n_heads
         self.attention = Attention_v1(args)
         self.feed_forward = FeedForward(
-            dim=args.dim, hidden_dim=4 * args.dim, multiple_of=args.multiple_of
+            dim=args.dim, hidden_dim=4 * args.dim, multiple_of=args.multiple_of,
         )
         self.layer_id = layer_id
         self.attention_norm = RMSNorm(args.dim, eps=args.norm_eps)
@@ -358,6 +359,7 @@ class Transformer(nn.Module):
         self.vocab_size = params.vocab_size
         self.n_layers = params.n_layers
 
+        TransformerBlock: Union[Type[TransformerBlock_v1], Type[TransformerBlock_v2]]
         if isinstance(params, ModelArgs_v1):
             TransformerBlock = TransformerBlock_v1
         else:
@@ -369,7 +371,7 @@ class Transformer(nn.Module):
 
         self.layers = torch.nn.ModuleList()
         for layer_id in range(params.n_layers):
-            self.layers.append(TransformerBlock(layer_id, params))
+            self.layers.append(TransformerBlock(layer_id, params))  # type: ignore
 
         self.norm = RMSNorm(params.dim, eps=params.norm_eps)
         self.output = ColumnParallelLinear(
