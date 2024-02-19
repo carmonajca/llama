@@ -50,7 +50,7 @@ UNSAFE_ERROR = "Error: special tags are not allowed as part of the prompt."
 
 class LLaMA:
     def __init__(self, model: Transformer, tokenizer: Tokenizer):
-        self.model = model
+        self.model = model.to("cuda")
         self.tokenizer = tokenizer
 
     def generate(
@@ -83,6 +83,7 @@ class LLaMA:
         input_text_mask = tokens != self.tokenizer.pad_id
         start_pos = min_prompt_size
         prev_pos = 0
+
         for cur_pos in range(start_pos, total_len):
             with torch.no_grad():
                 logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
@@ -197,7 +198,7 @@ class Llama:
         )
         tokenizer = Tokenizer(model_path=tokenizer_path)
         model_args.vocab_size = tokenizer.n_words
-        torch.set_default_dtype(torch.cuda.half)
+        torch.set_default_tensor_type(torch.cuda.HalfTensor)
         model = Transformer(model_args)
         model.load_state_dict(checkpoint, strict=False)
         print(f"Loaded in {time.time() - start_time:.2f} seconds")
@@ -205,7 +206,7 @@ class Llama:
         return Llama(model, tokenizer)
 
     def __init__(self, model: Transformer, tokenizer: Tokenizer):
-        self.model = model
+        self.model = model.to("cuda")
         self.tokenizer = tokenizer
 
     @torch.inference_mode()

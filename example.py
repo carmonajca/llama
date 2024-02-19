@@ -54,7 +54,7 @@ def load(
     )
     tokenizer = Tokenizer(model_path=tokenizer_path)
     model_args.vocab_size = tokenizer.n_words
-    torch.set_default_dtype(torch.cuda.half)
+    torch.set_default_dtype(torch.half)
     model = Transformer(model_args)
     torch.set_default_dtype(torch.float32)
     model.load_state_dict(checkpoint, strict=False)
