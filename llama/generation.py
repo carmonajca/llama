@@ -50,7 +50,7 @@ UNSAFE_ERROR = "Error: special tags are not allowed as part of the prompt."
 
 class LLaMA:
     def __init__(self, model: Transformer, tokenizer: Tokenizer):
-        self.model = model.to("cuda")
+        self.model = model
         self.tokenizer = tokenizer
 
     def generate(
@@ -206,7 +206,7 @@ class Llama:
         return Llama(model, tokenizer)
 
     def __init__(self, model: Transformer, tokenizer: Tokenizer):
-        self.model = model.to("cuda")
+        self.model = model
         self.tokenizer = tokenizer
 
     @torch.inference_mode()
