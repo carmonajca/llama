@@ -50,9 +50,10 @@ UNSAFE_ERROR = "Error: special tags are not allowed as part of the prompt."
 
 class LLaMA:
     def __init__(self, model: Transformer, tokenizer: Tokenizer):
-        self.model = model
+        self.model = model.to("cuda")
         self.tokenizer = tokenizer
 
+    @torch.inference_mode
     def generate(
         self,
         prompts: List[str],
@@ -85,8 +86,7 @@ class LLaMA:
         prev_pos = 0
 
         for cur_pos in range(start_pos, total_len):
-            with torch.no_grad():
-                logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
+            logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
             # repetition penalty from CTRL paper (https://arxiv.org/abs/1909.05858)
             if repetition_penalty != 1.0:
                 logits_new = logits.clone()
@@ -206,7 +206,7 @@ class Llama:
         return Llama(model, tokenizer)
 
     def __init__(self, model: Transformer, tokenizer: Tokenizer):
-        self.model = model
+        self.model = model.to("cuda")
         self.tokenizer = tokenizer
 
     @torch.inference_mode()
